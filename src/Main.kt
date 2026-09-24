@@ -1,14 +1,18 @@
+import kotlin.math.*
+
 fun main() {
-    println("Bienvenido al sistema de ubicación para zonas públicas WIFIIII")
+
+    //pido credenciales para iniciar
+    println("Bienvenido al sistema de ubicación para zonas públicas WIFI")
 
     val usuario = "51593"
-    var contrasena = "39515" // ahora es "var" porque el RF01 permite cambiarla
+    var contrasena = "39515" //"var" para cambiarla más adelante
 
     println("Ingrese su usuario: ")
     val entradaUsuario = readln()
 
     if (entradaUsuario != usuario) {
-        println("ERROR")
+        println("Error")
         return
     }
 
@@ -16,39 +20,72 @@ fun main() {
     val contrasenaEntrada = readln()
 
     if (contrasenaEntrada != contrasena) {
-        println("ERROR")
+        println("Error")
         return
     }
 
+    // captcha de seguridad
     val termino1 = 593
     val termino2 = (3 % 5) + 5 + 1
-    val resultado = termino1 + termino2
+    val resultadoCorrecto = termino1 + termino2
 
-    println("Ingrese el resultado: ")
     println("$termino1 + $termino2 =")
-
     val resultadoEntrada = readln().toInt()
 
-    if (resultadoEntrada != resultado) {
-        println("ERROR")
+    if (resultadoEntrada != resultadoCorrecto) {
+        println("Error")
         return
     }
 
     println("Sesión iniciada")
 
-    // ---------------------------------------------------------
-    // RETO 3: variables de apoyo
-    // ---------------------------------------------------------
-    // Rangos de validación de coordenadas según el PENÚLTIMO dígito
-    // del código de grupo (51593 -> 9 -> Curití, Santander)
+    // rango de validación según el penúltimo dígito
+
     val latSup = 6.690
     val latInf = 6.532
-    val lonOr = -72.872   // límite oriente (menos negativo)
-    val lonOcc = -73.120  // límite occidente (más negativo)
+    val lonOr = -72.872   // límite oriente
+    val lonOcc = -73.120  // límite occidente
 
-    // Matriz de 3 filas x 2 columnas: [fila][0]=latitud, [fila][1]=longitud
+    // para no repetir la misma validación en varias partes
+    fun coordenadaValida(lat: Double, lon: Double): Boolean {
+        return lat in latInf..latSup && lon in lonOcc..lonOr
+    }
+
     val coordenadas = Array(3) { DoubleArray(2) }
     var coordenadasCargadas = false
+
+    val zonasWifi = arrayOf(
+        doubleArrayOf(6.632, -72.984, 285.0),
+        doubleArrayOf(6.564, -73.061, 127.0),
+        doubleArrayOf(6.531, -73.002, 15.0),
+        doubleArrayOf(6.623, -72.978, 56.0)
+    )
+
+    for (i in 0..3) {
+        if (!coordenadaValida(zonasWifi[i][0], zonasWifi[i][1])) {
+            println("Aviso: la zona wifi ${i + 1} está fuera de los límites del reto 3 (revisar dato de la tabla anexa)")
+        }
+    }
+
+
+    // calcular la distancia (en metros)
+
+    fun calcularDistanciaMetros(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val radioTierraKm = 6372.795477598
+
+        val lat1Rad = Math.toRadians(lat1)
+        val lat2Rad = Math.toRadians(lat2)
+        val deltaLatRad = Math.toRadians(lat2 - lat1)
+        val deltaLonRad = Math.toRadians(lon2 - lon1)
+
+        val a = sin(deltaLatRad / 2).pow(2) +
+                cos(lat1Rad) * cos(lat2Rad) * sin(deltaLonRad / 2).pow(2)
+
+        val distanciaKm = 2 * radioTierraKm * asin(sqrt(a))
+
+        // la fórmula da el resultado en kilómetros y lo paso a metros
+        return distanciaKm * 1000
+    }
 
     val menu = mutableListOf(
         "Cambiar contraseña",
@@ -58,6 +95,7 @@ fun main() {
         "Actualizar registros de zonas wifi desde archivo"
     )
 
+    // contador de intentos fallidos
     var intentosFallidos = 0
 
     while (true) {
@@ -72,10 +110,15 @@ fun main() {
 
         val opcionElegida = readln().toInt()
 
+
+        if (opcionElegida in 1..7) {
+            intentosFallidos = 0
+        }
+
         when (opcionElegida) {
 
             1 -> {
-                // RF01: cambiar contraseña
+                // para cambiar contraseña
                 println("Ingrese la contraseña actual: ")
                 val actualIngresada = readln()
 
@@ -87,7 +130,7 @@ fun main() {
                 println("Ingrese la nueva contraseña: ")
                 val nueva = readln()
 
-                // la nueva contraseña no puede ser igual a la actual
+
                 if (nueva == contrasena) {
                     println("Error")
                     return
@@ -95,19 +138,18 @@ fun main() {
 
                 contrasena = nueva
                 println("Contraseña actualizada correctamente")
-                // el programa vuelve al menú principal (continúa el while)
+
             }
 
             2 -> {
                 if (!coordenadasCargadas) {
-                    // RF02: primera vez que ingresa las 3 coordenadas
+
                     for (i in 0..2) {
                         println("Ingrese la latitud del punto ${i + 1}: ")
                         val latTexto = readln()
                         println("Ingrese la longitud del punto ${i + 1}: ")
                         val lonTexto = readln()
 
-                        // si deja alguna coordenada vacía, termina con error
                         if (latTexto.isBlank() || lonTexto.isBlank()) {
                             println("Error")
                             return
@@ -116,8 +158,7 @@ fun main() {
                         val lat = latTexto.toDouble()
                         val lon = lonTexto.toDouble()
 
-                        // validación contra los rangos permitidos
-                        if (lat < latInf || lat > latSup || lon < lonOcc || lon > lonOr) {
+                        if (!coordenadaValida(lat, lon)) {
                             println("Error coordenada")
                             return
                         }
@@ -128,16 +169,14 @@ fun main() {
 
                     coordenadasCargadas = true
                     println("Coordenadas guardadas correctamente")
-                    // regresa al menú principal
+
                 } else {
-                    // RF03: ya hay coordenadas guardadas -> actualizar
                     for (i in 0..2) {
                         val latTxt = "%.3f".format(coordenadas[i][0])
                         val lonTxt = "%.3f".format(coordenadas[i][1])
                         println("coordenada [latitud,longitud] ${i + 1} : ['$latTxt', '$lonTxt']")
                     }
 
-                    // índice de la coordenada más al norte (mayor latitud)
                     var indiceNorte = 0
                     for (i in 1..2) {
                         if (coordenadas[i][0] > coordenadas[indiceNorte][0]) indiceNorte = i
@@ -149,8 +188,6 @@ fun main() {
                     val promLatTxt = "%.3f".format(promedioLat)
                     val promLonTxt = "%.3f".format(promedioLon)
 
-                    // Mensajes clave según el ÚLTIMO dígito del código de grupo (51593 -> 3):
-                    // "más al norte" y "promedio de todos los puntos"
                     println("La coordenada ${indiceNorte + 1} es la que está más al norte")
                     println("La coordenada promedio es: ['$promLatTxt', '$promLonTxt']")
 
@@ -159,7 +196,7 @@ fun main() {
 
                     when {
                         opcionActualizar == 0 -> {
-                            // regresa al menú principal sin cambios
+                            // regresa sin cambios
                         }
                         opcionActualizar in 1..3 -> {
                             println("Ingrese la nueva latitud: ")
@@ -167,7 +204,7 @@ fun main() {
                             println("Ingrese la nueva longitud: ")
                             val nuevaLon = readln().toDouble()
 
-                            if (nuevaLat < latInf || nuevaLat > latSup || nuevaLon < lonOcc || nuevaLon > lonOr) {
+                            if (!coordenadaValida(nuevaLat, nuevaLon)) {
                                 println("Error coordenada")
                                 return
                             }
@@ -175,7 +212,6 @@ fun main() {
                             coordenadas[opcionActualizar - 1][0] = nuevaLat
                             coordenadas[opcionActualizar - 1][1] = nuevaLon
                             println("Coordenada actualizada correctamente")
-                            // regresa al menú principal
                         }
                         else -> {
                             println("Error actualización")
@@ -185,7 +221,121 @@ fun main() {
                 }
             }
 
-            3, 4, 5 -> println("Usted ha elegido la opción número $opcionElegida")
+            3 -> {
+
+                // RETO 4 - zona wifi más cercana
+
+                if (!coordenadasCargadas) {
+                    println("Error sin registro de coordenadas")
+                    return
+                }
+
+                for (i in 0..2) {
+                    val latTxt = "%.3f".format(coordenadas[i][0])
+                    val lonTxt = "%.3f".format(coordenadas[i][1])
+                    println("coordenada [latitud,longitud] ${i + 1} : ['$latTxt', '$lonTxt']")
+                }
+
+                println("Por favor elija su ubicación actual (1,2 ó 3) para calcular la distancia a los puntos de conexión")
+                val ubicacionElegida = readln().toInt()
+
+                if (ubicacionElegida < 1 || ubicacionElegida > 3) {
+                    println("Error ubicación")
+                    return
+                }
+
+                val latUsuario = coordenadas[ubicacionElegida - 1][0]
+                val lonUsuario = coordenadas[ubicacionElegida - 1][1]
+
+                // calculo la distancia desde la ubicación elegida
+                val distancias = DoubleArray(4)
+                for (i in 0..3) {
+                    distancias[i] = calcularDistanciaMetros(
+                        latUsuario, lonUsuario,
+                        zonasWifi[i][0], zonasWifi[i][1]
+                    )
+                }
+
+                var indiceMasCercana = 0
+                for (i in 1..3) {
+                    if (distancias[i] < distancias[indiceMasCercana]) {
+                        indiceMasCercana = i
+                    }
+                }
+
+                var indiceSegundaCercana = -1
+                for (i in 0..3) {
+                    if (i != indiceMasCercana) {
+                        if (indiceSegundaCercana == -1 || distancias[i] < distancias[indiceSegundaCercana]) {
+                            indiceSegundaCercana = i
+                        }
+                    }
+                }
+
+                var indiceMenosUsuarios = indiceMasCercana
+                var indiceMasUsuarios = indiceSegundaCercana
+                if (zonasWifi[indiceSegundaCercana][2] < zonasWifi[indiceMasCercana][2]) {
+                    indiceMenosUsuarios = indiceSegundaCercana
+                    indiceMasUsuarios = indiceMasCercana
+                }
+
+                println("Zonas wifi cercanas con menos usuarios")
+
+                val lat1Txt = "%.3f".format(zonasWifi[indiceMenosUsuarios][0])
+                val lon1Txt = "%.3f".format(zonasWifi[indiceMenosUsuarios][1])
+                val dist1Txt = "%.0f".format(distancias[indiceMenosUsuarios])
+                val usu1 = zonasWifi[indiceMenosUsuarios][2].toInt()
+                println("La zona wifi 1: ubicada en ['$lat1Txt','$lon1Txt'] a $dist1Txt metros , tiene en promedio $usu1 usuarios")
+
+                val lat2Txt = "%.3f".format(zonasWifi[indiceMasUsuarios][0])
+                val lon2Txt = "%.3f".format(zonasWifi[indiceMasUsuarios][1])
+                val dist2Txt = "%.0f".format(distancias[indiceMasUsuarios])
+                val usu2 = zonasWifi[indiceMasUsuarios][2].toInt()
+                println("La zona wifi 2: ubicada en ['$lat2Txt','$lon2Txt'] a $dist2Txt metros , tiene en promedio $usu2 usuarios")
+
+                println("Elija 1 o 2 para recibir indicaciones de llegada")
+                val zonaElegida = readln().toInt()
+
+                if (zonaElegida != 1 && zonaElegida != 2) {
+                    println("Error zona wifi")
+                    return
+                }
+
+                val indiceZonaFinal = if (zonaElegida == 1) indiceMenosUsuarios else indiceMasUsuarios
+                val distanciaFinal = distancias[indiceZonaFinal]
+
+                val deltaLat = zonasWifi[indiceZonaFinal][0] - latUsuario
+                val deltaLon = zonasWifi[indiceZonaFinal][1] - lonUsuario
+
+                val direccionVertical = if (deltaLat >= 0) "norte" else "sur"
+                val direccionHorizontal = if (deltaLon >= 0) "oriente" else "occidente"
+
+                println("Para llegar a la zona wifi dirigirse primero al $direccionHorizontal y luego hacia el $direccionVertical")
+
+                val velocidadBusMS = 16.67
+                val velocidadBicicletaMS = 3.33
+
+                val tiempoBusMin = (distanciaFinal / velocidadBusMS) / 60
+                val tiempoBicicletaMin = (distanciaFinal / velocidadBicicletaMS) / 60
+
+                println("Tiempo en bus: ${"%.1f".format(tiempoBusMin)} minutos")
+                println("Tiempo en bicicleta: ${"%.1f".format(tiempoBicicletaMin)} minutos")
+
+                //OJO
+                println("Presione 0 para salir")
+                val salir = readln().toInt()
+
+                if (salir != 0) {
+                    println("Error zona wifi")
+                    return
+                }
+            }
+
+            4, 5 -> {
+
+                println("Usted ha elegido la opción número $opcionElegida")
+                return
+            }
 
             6 -> {
                 println("Seleccione opción favorita")
@@ -200,22 +350,24 @@ fun main() {
                 val respuesta1 = readln().toInt()
 
                 if (respuesta1 != 9) {
+                    // si falla la primera adivinanza, no se hace el cambio
                     println("Error")
-                    return
+                } else {
+                    println("Me separaron de mi hermano siamés, antes era un ocho y ahora soy un…, la respuesta es:")
+                    val respuesta2 = readln().toInt()
+
+                    if (respuesta2 != 3) {
+
+                        println("Error")
+                    } else {
+
+                        val elegida = menu[favorita - 1]
+                        menu.removeAt(favorita - 1)
+                        menu.add(0, elegida)
+                        println("Opción favorita actualizada correctamente")
+                    }
                 }
 
-                println("Me separaron de mi hermano siamés, antes era un ocho y ahora soy un…, la respuesta es:")
-                val respuesta2 = readln().toInt()
-
-                if (respuesta2 != 3) {
-                    println("Error")
-                    return
-                }
-
-                val elegida = menu[favorita - 1]
-                menu.removeAt(favorita - 1)
-                menu.add(0, elegida)
-                // el while vuelve a repetir y muestra el menú ya actualizado
             }
 
             7 -> {
@@ -226,9 +378,10 @@ fun main() {
             else -> {
                 intentosFallidos++
                 println("Error")
-                if (intentosFallidos >= 3) {
+                if (intentosFallidos > 3) {
                     return
                 }
+                // si aún no llega a 3 fallos seguidos, se vuelve a pedir la opción
             }
         }
     }
